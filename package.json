@@ -1,0 +1,27 @@
+{
+  "name": "freelancehub-backend",
+  "version": "1.0.0",
+  "description": "API REST FreelanceHub — Node.js + Express + MongoDB",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^143.0.4",
+    "axios": "^1.15.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.0",
+    "pdfkit": "^0.18.0",
+    "puppeteer-core": "^24.40.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
