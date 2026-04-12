@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 
-// Schéma d'une ligne de facture
 const ligneSchema = new mongoose.Schema({
   description: { type: String, required: true },
   quantite: { type: Number, default: 1, min: 1 },
@@ -8,7 +7,6 @@ const ligneSchema = new mongoose.Schema({
   total: { type: Number },
 });
 
-// Calcul automatique du total de chaque ligne
 ligneSchema.pre('save', function (next) {
   this.total = this.quantite * this.prixUnitaire;
   next();
@@ -17,8 +15,6 @@ ligneSchema.pre('save', function (next) {
 const invoiceSchema = new mongoose.Schema({
   numero: {
     type: String,
-    unique: true,
-    // Ex: FAC-2026-001 — généré automatiquement
   },
   freelance: {
     type: mongoose.Schema.Types.ObjectId,
@@ -38,9 +34,9 @@ const invoiceSchema = new mongoose.Schema({
   },
   lignes: [ligneSchema],
   sousTotal: { type: Number, default: 0 },
-  tva: { type: Number, default: 0 },       // pourcentage (ex: 18)
+  tva: { type: Number, default: 0 },
   montantTva: { type: Number, default: 0 },
-  remise: { type: Number, default: 0 },    // montant fixe en XOF
+  remise: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
   devise: { type: String, default: 'XOF' },
   statut: {
@@ -60,48 +56,45 @@ const invoiceSchema = new mongoose.Schema({
     type: String,
     default: 'Paiement à réception de facture',
   },
-  // Référence de transaction paiement Wave/Orange
   transactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Transaction',
   },
-  // URL du PDF généré
   pdfUrl: String,
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 
-// Générer le numéro de facture automatiquement avant création
 invoiceSchema.pre('save', async function (next) {
   this.updatedAt = Date.now();
 
   if (!this.numero) {
     const annee = new Date().getFullYear();
-    const count = await mongoose.model('Invoice').countDocuments({
-      freelance: this.freelance,
-    });
-    const num = String(count + 1).padStart(3, '0');
-    this.numero = `FAC-${annee}-${num}`;
+    const derniere = await mongoose.model('Invoice').findOne(
+      { freelance: this.freelance },
+      { numero: 1 },
+      { sort: { createdAt: -1 } }
+    );
+    let num = 1;
+    if (derniere && derniere.numero) {
+      const parts = derniere.numero.split('-');
+      const dernierNum = parseInt(parts[2]) || 0;
+      num = dernierNum + 1;
+    }
+    this.numero = `FAC-${annee}-${String(num).padStart(3, '0')}`;
   }
 
-  // Recalculer les totaux
   this.sousTotal = this.lignes.reduce((sum, l) => sum + l.quantite * l.prixUnitaire, 0);
   this.montantTva = Math.round(this.sousTotal * (this.tva / 100));
   this.total = this.sousTotal + this.montantTva - this.remise;
 
-  // Marquer en retard si dépassée et non payée
-  if (
-    this.dateEcheance &&
-    new Date() > this.dateEcheance &&
-    this.statut === 'en_attente'
-  ) {
+  if (this.dateEcheance && new Date() > this.dateEcheance && this.statut === 'en_attente') {
     this.statut = 'en_retard';
   }
 
   next();
 });
 
-// Champ virtuel : jours restants avant échéance
 invoiceSchema.virtual('joursRestants').get(function () {
   if (!this.dateEcheance) return null;
   const diff = this.dateEcheance - new Date();
